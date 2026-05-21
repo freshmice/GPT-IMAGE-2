@@ -15,7 +15,7 @@ import { ResultGallery } from "@/components/studio/result-gallery";
 import { MultiImageUpload } from "@/components/studio/multi-image-upload";
 import { useCredentialsStore } from "@/lib/store/credentials";
 import { useHistoryStore } from "@/lib/store/history";
-import { apiEdit, saveImagesForHistory } from "@/lib/fetcher";
+import { apiEdit, imagesToHistoryRefs, resultGalleryImages } from "@/lib/fetcher";
 import { SIZES_EDIT, QUALITIES } from "@/lib/constants";
 import { STORYBOARD_FRAME_TEMPLATE } from "@/lib/prompts";
 import type { GeneratedImage } from "@/lib/types";
@@ -97,14 +97,14 @@ export default function StoryboardPage() {
         size,
         quality,
         n: 1,
+        prefix: "storyboard",
       });
       setResults(res.images);
       setElapsedMs(res.elapsedMs);
-      const savedRefs = await saveImagesForHistory(res.images, "storyboard");
       pushHistory({
         type: "storyboard",
         prompt,
-        images: savedRefs,
+        images: imagesToHistoryRefs(res.images),
         elapsedMs: res.elapsedMs,
         createdAt: Date.now(),
       });
@@ -214,12 +214,7 @@ export default function StoryboardPage() {
           </Card>
 
           {results.length > 0 && (
-            <ResultGallery
-              images={results.map((img) => ({
-                b64: img.b64_json,
-                mimeType: img.mimeType,
-              }))}
-            />
+            <ResultGallery images={resultGalleryImages(results)} />
           )}
         </div>
 

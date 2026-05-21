@@ -14,7 +14,12 @@ import { GenerateBar } from "@/components/studio/generate-bar";
 import { ResultGallery } from "@/components/studio/result-gallery";
 import { useCredentialsStore } from "@/lib/store/credentials";
 import { useHistoryStore } from "@/lib/store/history";
-import { apiGenerate, apiParseFile, saveImagesForHistory } from "@/lib/fetcher";
+import {
+  apiGenerate,
+  apiParseFile,
+  imagesToHistoryRefs,
+  resultGalleryImages,
+} from "@/lib/fetcher";
 import { SIZES_GENERATE, QUALITIES } from "@/lib/constants";
 import type { GeneratedImage } from "@/lib/types";
 
@@ -81,14 +86,14 @@ export default function TextFilePage() {
         n,
         size,
         quality,
+        prefix: "txtfile",
       });
       setResults(res.images);
       setElapsedMs(res.elapsedMs);
-      const refs = await saveImagesForHistory(res.images, "txtfile");
       pushHistory({
         type: "generate",
         prompt: finalPrompt,
-        images: refs,
+        images: imagesToHistoryRefs(res.images),
         elapsedMs: res.elapsedMs,
         createdAt: Date.now(),
       });
@@ -182,12 +187,7 @@ export default function TextFilePage() {
           </Card>
 
           {results.length > 0 && (
-            <ResultGallery
-              images={results.map((img) => ({
-                b64: img.b64_json,
-                mimeType: img.mimeType,
-              }))}
-            />
+            <ResultGallery images={resultGalleryImages(results)} />
           )}
         </div>
 

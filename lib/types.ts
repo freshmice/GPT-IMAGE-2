@@ -16,6 +16,7 @@ export interface GenerateRequest extends Credentials {
   quality?: string;
   outputFormat?: OutputFormat;
   background?: Background;
+  prefix?: string;
 }
 
 export interface EditRequest extends Credentials {
@@ -25,11 +26,17 @@ export interface EditRequest extends Credentials {
   n?: number;
   size?: Size;
   quality?: string;
+  prefix?: string;
 }
 
 export interface GeneratedImage {
-  b64_json: string;
+  url: string;
+  downloadUrl?: string;
+  pathname?: string;
+  name: string;
   mimeType?: string;
+  size?: number;
+  createdAt?: number;
 }
 
 export interface GenerateResponse {
@@ -42,8 +49,10 @@ export interface ApiErrorResponse {
 }
 
 export interface HistoryImageRef {
-  path: string;   // /outputs/xxx.png — served from public/
+  path: string;
   name: string;
+  downloadUrl?: string;
+  size?: number;
 }
 
 export interface HistoryItem {

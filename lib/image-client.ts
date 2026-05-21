@@ -3,42 +3,74 @@
 import imageCompression from "browser-image-compression";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_EDGE } from "@/lib/constants";
 
+const UPLOAD_FORMATS = [
+  { mimeType: "image/png", extension: "png", initialQuality: 1 },
+  { mimeType: "image/webp", extension: "webp", initialQuality: 0.86 },
+  { mimeType: "image/jpeg", extension: "jpg", initialQuality: 0.86 },
+] as const;
+
 /**
- * 把任意图片压成 ≤3MB 的 PNG。/v1/images/edits 最稳走 PNG。
- * 先统一长边到 1536 再压；PNG 不够就按 0.85 倍逐步缩尺寸。
+ * Compresses uploads so multipart edit requests stay under Vercel's body limit.
+ * PNG is preferred, with WebP/JPEG fallbacks for detailed images that need more compression.
  */
-export async function compressToPng(file: File): Promise<File> {
-  const first = await imageCompression(file, {
-    maxSizeMB: MAX_UPLOAD_BYTES / 1_048_576,
-    maxWidthOrHeight: MAX_UPLOAD_EDGE,
-    useWebWorker: true,
-    fileType: "image/png",
-    initialQuality: 1,
-  });
+export async function compressForUpload(
+  file: File,
+  maxBytes = MAX_UPLOAD_BYTES,
+): Promise<File> {
+  const targetBytes = Math.min(maxBytes, MAX_UPLOAD_BYTES);
+  let smallest: File | undefined;
 
-  if (first.size <= MAX_UPLOAD_BYTES) return toPngFile(first, file.name);
-
-  let current: File = first;
-  for (let i = 0; i < 6 && current.size > MAX_UPLOAD_BYTES; i++) {
-    const edge = Math.max(
-      640,
-      Math.floor(MAX_UPLOAD_EDGE * Math.pow(0.85, i + 1)),
-    );
-    current = await imageCompression(current, {
-      maxSizeMB: MAX_UPLOAD_BYTES / 1_048_576,
-      maxWidthOrHeight: edge,
-      useWebWorker: true,
-      fileType: "image/png",
-    });
+  for (const format of UPLOAD_FORMATS) {
+    const compressed = await compressWithFormat(file, targetBytes, format);
+    if (compressed.size <= targetBytes) return compressed;
+    if (!smallest || compressed.size < smallest.size) smallest = compressed;
   }
-  if (current.size > MAX_UPLOAD_BYTES)
-    throw new Error("图片过大，无法压到 3MB，请先手动裁剪。");
-  return toPngFile(current, file.name);
+
+  throw new Error(
+    `图片过大，无法压缩到 ${formatBytes(targetBytes)}，请先裁剪或减少参考图数量。`,
+  );
 }
 
-function toPngFile(blob: Blob, originalName: string): File {
+export const compressToPng = compressForUpload;
+
+async function compressWithFormat(
+  file: File,
+  maxBytes: number,
+  format: (typeof UPLOAD_FORMATS)[number],
+) {
+  let current: File | undefined;
+
+  for (let i = 0; i < 9; i++) {
+    const edge = Math.max(
+      320,
+      Math.floor(MAX_UPLOAD_EDGE * Math.pow(0.82, i)),
+    );
+    const blob = await imageCompression(file, {
+      maxSizeMB: maxBytes / 1_048_576,
+      maxWidthOrHeight: edge,
+      useWebWorker: true,
+      fileType: format.mimeType,
+      initialQuality: format.initialQuality,
+    });
+    current = toImageFile(blob, file.name, format.extension, format.mimeType);
+    if (current.size <= maxBytes) return current;
+  }
+
+  return current ?? file;
+}
+
+function toImageFile(
+  blob: Blob,
+  originalName: string,
+  extension: string,
+  mimeType: string,
+): File {
   const base = originalName.replace(/\.[^.]+$/, "") || "image";
-  return new File([blob], `${base}.png`, { type: "image/png" });
+  return new File([blob], `${base}.${extension}`, { type: mimeType });
+}
+
+function formatBytes(bytes: number) {
+  return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
 export function fileToDataUrl(file: File): Promise<string> {

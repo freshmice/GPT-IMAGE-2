@@ -27,7 +27,8 @@ export const QUALITIES = ["auto", "low", "medium", "high"] as const;
 export const OUTPUT_FORMATS = ["png", "jpeg", "webp"] as const;
 export const BACKGROUNDS = ["auto", "transparent", "opaque"] as const;
 
-export const MAX_UPLOAD_BYTES = 3_000_000;
+export const MAX_UPLOAD_BYTES = 3_800_000;
+export const MAX_UPLOAD_TOTAL_BYTES = 3_800_000;
 export const MAX_UPLOAD_EDGE = 1536;
 export const MAX_REFS = 5;
 

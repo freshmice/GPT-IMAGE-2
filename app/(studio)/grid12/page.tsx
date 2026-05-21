@@ -15,7 +15,12 @@ import { ResultGallery } from "@/components/studio/result-gallery";
 import { MultiImageUpload } from "@/components/studio/multi-image-upload";
 import { useCredentialsStore } from "@/lib/store/credentials";
 import { useHistoryStore } from "@/lib/store/history";
-import { apiEdit, apiGenerate, saveImagesForHistory } from "@/lib/fetcher";
+import {
+  apiEdit,
+  apiGenerate,
+  imagesToHistoryRefs,
+  resultGalleryImages,
+} from "@/lib/fetcher";
 import { SIZES_EDIT, SIZES_GENERATE, QUALITIES } from "@/lib/constants";
 import {
   TWELVE_GRID_DEFAULT_CELLS,
@@ -80,6 +85,7 @@ export default function Grid12Page() {
           size,
           quality,
           n: 1,
+          prefix: "grid12",
         });
       } else {
         res = await apiGenerate({
@@ -90,15 +96,15 @@ export default function Grid12Page() {
           n: 1,
           size,
           quality,
+          prefix: "grid12",
         });
       }
       setResults(res.images);
       setElapsedMs(res.elapsedMs);
-      const savedRefs = await saveImagesForHistory(res.images, "grid12");
       pushHistory({
         type: "grid12",
         prompt,
-        images: savedRefs,
+        images: imagesToHistoryRefs(res.images),
         elapsedMs: res.elapsedMs,
         createdAt: Date.now(),
       });
@@ -197,12 +203,7 @@ export default function Grid12Page() {
           </Card>
 
           {results.length > 0 && (
-            <ResultGallery
-              images={results.map((img) => ({
-                b64: img.b64_json,
-                mimeType: img.mimeType,
-              }))}
-            />
+            <ResultGallery images={resultGalleryImages(results)} />
           )}
         </div>
 

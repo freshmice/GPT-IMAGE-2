@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { Trash2, Download, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -125,15 +124,15 @@ function HistoryCard({
                   key={idx}
                   className="group relative aspect-square overflow-hidden rounded-lg border bg-checker"
                 >
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src={img.path}
                     alt={`history ${idx + 1}`}
-                    fill
-                    className="object-contain"
-                    unoptimized
+                    className="h-full w-full object-contain"
+                    loading="lazy"
                   />
                   <a
-                    href={img.path}
+                    href={img.downloadUrl || img.path}
                     download={img.name}
                     className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
                     onClick={(e) => e.stopPropagation()}

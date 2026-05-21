@@ -16,6 +16,7 @@ const Schema = z.object({
   quality: z.enum(["auto", "low", "medium", "high"]).optional(),
   outputFormat: z.enum(["png", "jpeg", "webp"]).optional(),
   background: z.enum(["auto", "transparent", "opaque"]).optional(),
+  prefix: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
       apiKey: data.apiKey,
       baseUrl,
       body,
+      prefix: data.prefix,
     });
     return NextResponse.json({ images, elapsedMs });
   } catch (e) {

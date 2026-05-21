@@ -10,3 +10,5 @@ dist
 tsconfig.tsbuildinfo
 public/outputs/*
 !public/outputs/.gitkeep
+
+.env*.local

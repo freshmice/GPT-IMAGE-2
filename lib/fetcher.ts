@@ -3,7 +3,6 @@ import type {
   EditRequest,
   GenerateResponse,
   GeneratedImage,
-  HistoryImageRef,
   ApiErrorResponse,
 } from "@/lib/types";
 
@@ -30,6 +29,15 @@ export async function apiGenerate(
   return res.json();
 }
 
+export function resultGalleryImages(images: GeneratedImage[]) {
+  return images.map((img) => ({
+    url: img.url,
+    downloadUrl: img.downloadUrl,
+    name: img.name,
+    mimeType: img.mimeType,
+  }));
+}
+
 export async function apiEdit(
   req: EditRequest,
   signal?: AbortSignal,
@@ -42,6 +50,7 @@ export async function apiEdit(
   if (req.n != null) fd.set("n", String(req.n));
   if (req.size) fd.set("size", req.size);
   if (req.quality) fd.set("quality", req.quality);
+  if (req.prefix) fd.set("prefix", req.prefix);
   for (const [i, img] of req.images.entries()) {
     fd.append("image", img, img.name || `ref${i}.png`);
   }
@@ -57,29 +66,13 @@ export async function apiEdit(
   return res.json();
 }
 
-// Saves images to disk and returns path refs for history storage.
-// Falls back to empty array on failure so history still records the prompt.
-export async function saveImagesForHistory(
-  images: GeneratedImage[],
-  prefix?: string,
-): Promise<HistoryImageRef[]> {
-  const results = await Promise.allSettled(
-    images.map(async (img) => {
-      const res = await fetch("/api/save-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ b64: img.b64_json, mimeType: img.mimeType, prefix }),
-      });
-      if (!res.ok) return null;
-      return res.json() as Promise<{ path: string; name: string }>;
-    }),
-  );
-  return results
-    .filter(
-      (r): r is PromiseFulfilledResult<{ path: string; name: string }> =>
-        r.status === "fulfilled" && !!r.value?.path,
-    )
-    .map((r) => ({ path: r.value.path, name: r.value.name }));
+export function imagesToHistoryRefs(images: GeneratedImage[]) {
+  return images.map((img) => ({
+    path: img.url,
+    name: img.name,
+    downloadUrl: img.downloadUrl,
+    size: img.size,
+  }));
 }
 
 export async function apiParseFile(

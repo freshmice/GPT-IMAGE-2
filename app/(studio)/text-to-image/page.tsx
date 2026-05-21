@@ -11,7 +11,11 @@ import { GenerateBar } from "@/components/studio/generate-bar";
 import { ResultGallery } from "@/components/studio/result-gallery";
 import { useCredentialsStore } from "@/lib/store/credentials";
 import { useHistoryStore } from "@/lib/store/history";
-import { apiGenerate, saveImagesForHistory } from "@/lib/fetcher";
+import {
+  apiGenerate,
+  imagesToHistoryRefs,
+  resultGalleryImages,
+} from "@/lib/fetcher";
 import { SIZES_GENERATE, QUALITIES } from "@/lib/constants";
 import type { GeneratedImage } from "@/lib/types";
 
@@ -47,14 +51,14 @@ export default function TextToImagePage() {
         n,
         size,
         quality,
+        prefix: "txt2img",
       });
       setImages(res.images);
       setElapsedMs(res.elapsedMs);
-      const refs = await saveImagesForHistory(res.images, "txt2img");
       pushHistory({
         type: "generate",
         prompt: prompt.trim(),
-        images: refs,
+        images: imagesToHistoryRefs(res.images),
         elapsedMs: res.elapsedMs,
         createdAt: Date.now(),
       });
@@ -97,12 +101,7 @@ export default function TextToImagePage() {
           </Card>
 
           {images.length > 0 && (
-            <ResultGallery
-              images={images.map((img) => ({
-                b64: img.b64_json,
-                mimeType: img.mimeType,
-              }))}
-            />
+            <ResultGallery images={resultGalleryImages(images)} />
           )}
         </div>
 

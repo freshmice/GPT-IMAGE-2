@@ -1,5 +1,6 @@
 import { normalizeUpstreamError } from "@/lib/errors";
 import type { GeneratedImage } from "@/lib/types";
+import { storeImage, type ImageToStore } from "@/lib/image-storage";
 
 export interface UpstreamImage {
   b64_json?: string;
@@ -11,8 +12,9 @@ export async function callGenerations(opts: {
   apiKey: string;
   baseUrl: string;
   body: Record<string, unknown>;
+  prefix?: string;
 }): Promise<{ images: GeneratedImage[]; elapsedMs: number }> {
-  const { apiKey, baseUrl, body } = opts;
+  const { apiKey, baseUrl, body, prefix } = opts;
   const t0 = Date.now();
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/images/generations`, {
     method: "POST",
@@ -25,7 +27,7 @@ export async function callGenerations(opts: {
   });
   if (!res.ok) throw new Error(await normalizeUpstreamError(res, baseUrl));
   const json = (await res.json()) as { data?: UpstreamImage[] };
-  const images = await toGeneratedImages(json.data || []);
+  const images = await toGeneratedImages(json.data || [], prefix);
   return { images, elapsedMs: Date.now() - t0 };
 }
 
@@ -34,8 +36,9 @@ export async function callEdits(opts: {
   apiKey: string;
   baseUrl: string;
   form: FormData;
+  prefix?: string;
 }): Promise<{ images: GeneratedImage[]; elapsedMs: number }> {
-  const { apiKey, baseUrl, form } = opts;
+  const { apiKey, baseUrl, form, prefix } = opts;
   const t0 = Date.now();
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/images/edits`, {
     method: "POST",
@@ -45,25 +48,29 @@ export async function callEdits(opts: {
   });
   if (!res.ok) throw new Error(await normalizeUpstreamError(res, baseUrl));
   const json = (await res.json()) as { data?: UpstreamImage[] };
-  const images = await toGeneratedImages(json.data || []);
+  const images = await toGeneratedImages(json.data || [], prefix);
   return { images, elapsedMs: Date.now() - t0 };
 }
 
 async function toGeneratedImages(
   items: UpstreamImage[],
+  prefix?: string,
 ): Promise<GeneratedImage[]> {
-  const out: GeneratedImage[] = [];
+  const out: ImageToStore[] = [];
   for (const it of items) {
     if (it.b64_json) {
-      out.push({ b64_json: it.b64_json, mimeType: "image/png" });
+      out.push({
+        bytes: Buffer.from(it.b64_json, "base64"),
+        mimeType: "image/png",
+      });
     } else if (it.url) {
       const r = await fetch(it.url, { cache: "no-store" });
       if (!r.ok) continue;
       const buf = await r.arrayBuffer();
       const mimeType = r.headers.get("content-type") || "image/png";
-      out.push({ b64_json: Buffer.from(buf).toString("base64"), mimeType });
+      out.push({ bytes: Buffer.from(buf), mimeType });
     }
   }
   if (out.length === 0) throw new Error("上游未返回可用图像");
-  return out;
+  return Promise.all(out.map((image) => storeImage(image, prefix)));
 }

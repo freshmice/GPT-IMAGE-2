@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { Download, ZoomIn, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn, downloadDataUrl } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface GalleryImage {
-  b64: string;
+  url: string;
+  downloadUrl?: string;
+  name?: string;
   mimeType?: string;
 }
 
@@ -21,14 +22,13 @@ export function ResultGallery({ images, className }: Props) {
 
   if (images.length === 0) return null;
 
-  function src(img: GalleryImage) {
-    const mime = img.mimeType ?? "image/png";
-    return `data:${mime};base64,${img.b64}`;
+  function downloadHref(img: GalleryImage) {
+    return img.downloadUrl || img.url;
   }
 
-  function handleDownload(img: GalleryImage, idx: number) {
+  function filename(img: GalleryImage, idx: number) {
     const ext = (img.mimeType ?? "image/png").split("/")[1] ?? "png";
-    downloadDataUrl(src(img), `result-${idx + 1}.${ext}`);
+    return img.name || `result-${idx + 1}.${ext}`;
   }
 
   return (
@@ -51,12 +51,12 @@ export function ResultGallery({ images, className }: Props) {
             key={idx}
             className="group relative overflow-hidden rounded-xl border bg-checker aspect-square"
           >
-            <Image
-              src={src(img)}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={img.url}
               alt={`result ${idx + 1}`}
-              fill
-              className="object-contain"
-              unoptimized
+              className="h-full w-full object-contain"
+              loading="lazy"
             />
             <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
               <Button
@@ -64,17 +64,23 @@ export function ResultGallery({ images, className }: Props) {
                 variant="secondary"
                 className="h-8 w-8"
                 onClick={() => setLightbox(idx)}
+                aria-label="预览"
               >
                 <ZoomIn className="h-4 w-4" />
               </Button>
-              <Button
-                size="icon"
-                variant="secondary"
-                className="h-8 w-8"
-                onClick={() => handleDownload(img, idx)}
+              <a
+                href={downloadHref(img)}
+                download={filename(img, idx)}
+                onClick={(e) => e.stopPropagation()}
+                className={buttonVariants({
+                  size: "icon",
+                  variant: "secondary",
+                  className: "h-8 w-8",
+                })}
+                aria-label="下载"
               >
                 <Download className="h-4 w-4" />
-              </Button>
+              </a>
             </div>
           </div>
         ))}
@@ -90,6 +96,7 @@ export function ResultGallery({ images, className }: Props) {
             variant="ghost"
             className="absolute right-4 top-4 text-white hover:bg-white/20"
             onClick={() => setLightbox(null)}
+            aria-label="关闭预览"
           >
             <X className="h-5 w-5" />
           </Button>
@@ -99,19 +106,19 @@ export function ResultGallery({ images, className }: Props) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={src(images[lightbox])}
+              src={images[lightbox].url}
               alt="preview"
               className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain"
             />
             <div className="mt-3 flex justify-center">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleDownload(images[lightbox], lightbox)}
+              <a
+                href={downloadHref(images[lightbox])}
+                download={filename(images[lightbox], lightbox)}
+                className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium hover:bg-secondary/80"
               >
                 <Download className="mr-2 h-4 w-4" />
                 下载
-              </Button>
+              </a>
             </div>
           </div>
         </div>

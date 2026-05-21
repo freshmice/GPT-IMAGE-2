@@ -4,7 +4,8 @@ import * as React from "react";
 import { useDropzone } from "react-dropzone";
 import { X, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { compressToPng } from "@/lib/image-client";
+import { compressForUpload } from "@/lib/image-client";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_TOTAL_BYTES } from "@/lib/constants";
 
 interface Props {
   value: File[];
@@ -37,10 +38,15 @@ export function MultiImageUpload({
       if (accepted.length === 0) return;
       setCompressing(true);
       try {
-        const compressed = await Promise.all(
-          accepted.map((f) => compressToPng(f)),
+        const nextFiles = [...value, ...accepted].slice(0, maxFiles);
+        const perFileBytes = Math.min(
+          MAX_UPLOAD_BYTES,
+          Math.floor(MAX_UPLOAD_TOTAL_BYTES / Math.max(1, nextFiles.length)),
         );
-        onChange([...value, ...compressed].slice(0, maxFiles));
+        const compressed = await Promise.all(
+          nextFiles.map((f) => compressForUpload(f, perFileBytes)),
+        );
+        onChange(compressed);
       } finally {
         setCompressing(false);
       }
@@ -68,7 +74,7 @@ export function MultiImageUpload({
           <ImagePlus className="h-8 w-8 opacity-50" />
           <span>{compressing ? "压缩中…" : label}</span>
           <span className="text-xs opacity-60">
-            PNG / JPG / WEBP · 自动压缩至 3 MB · 最多 {maxFiles} 张
+            PNG / JPG / WEBP · 自动压缩至总计 3.8 MB · 最多 {maxFiles} 张
           </span>
         </div>
       )}

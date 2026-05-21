@@ -16,6 +16,7 @@ export async function POST(req: Request) {
   const prompt = String(raw.get("prompt") ?? "").trim();
   const size = String(raw.get("size") ?? "");
   const quality = String(raw.get("quality") ?? "");
+  const prefix = String(raw.get("prefix") ?? "");
   const n = Number(raw.get("n") ?? 1);
 
   if (!apiKey) return NextResponse.json({ error: "缺少 apiKey" }, { status: 400 });
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
       apiKey,
       baseUrl: allowedBaseUrl,
       form: upstream,
+      prefix,
     });
     return NextResponse.json({ images: out, elapsedMs });
   } catch (e) {

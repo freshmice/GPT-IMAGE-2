@@ -11,6 +11,9 @@ import { prettyBytes } from "@/lib/utils";
 interface SavedItem {
   name: string;
   path: string;
+  url?: string;
+  downloadUrl?: string;
+  pathname?: string;
   size: number;
   mtime: number;
 }
@@ -53,7 +56,11 @@ export default function SavedPage() {
     const res = await fetch("/api/saved-images", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: item.name }),
+      body: JSON.stringify({
+        name: item.name,
+        pathname: item.pathname,
+        url: item.url || item.path,
+      }),
     });
     if (res.ok) {
       setItems((prev) => prev.filter((i) => i.name !== item.name));
@@ -69,7 +76,7 @@ export default function SavedPage() {
       <div className="flex items-start justify-between">
         <PageHeader
           title="已保存图片"
-          description={`共 ${items.length} 张，保存在服务器 public/outputs/ 目录`}
+          description={`共 ${items.length} 张，保存在持久图片存储中`}
           className="mb-0"
         />
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -140,7 +147,7 @@ export default function SavedPage() {
             />
             <div className="flex items-center justify-center gap-2">
               <a
-                href={lightbox.path}
+                href={lightbox.downloadUrl || lightbox.path}
                 download={lightbox.name}
                 className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium hover:bg-secondary/80"
                 onClick={(e) => e.stopPropagation()}

@@ -12,7 +12,7 @@ import { ResultGallery } from "@/components/studio/result-gallery";
 import { MultiImageUpload } from "@/components/studio/multi-image-upload";
 import { useCredentialsStore } from "@/lib/store/credentials";
 import { useHistoryStore } from "@/lib/store/history";
-import { apiEdit, saveImagesForHistory } from "@/lib/fetcher";
+import { apiEdit, imagesToHistoryRefs, resultGalleryImages } from "@/lib/fetcher";
 import { SIZES_EDIT, QUALITIES } from "@/lib/constants";
 import type { GeneratedImage } from "@/lib/types";
 
@@ -54,14 +54,14 @@ export default function EditPage() {
         size,
         quality,
         n,
+        prefix: "edit",
       });
       setResults(res.images);
       setElapsedMs(res.elapsedMs);
-      const refs = await saveImagesForHistory(res.images, "edit");
       pushHistory({
         type: "edit",
         prompt: prompt.trim(),
-        images: refs,
+        images: imagesToHistoryRefs(res.images),
         elapsedMs: res.elapsedMs,
         createdAt: Date.now(),
       });
@@ -114,12 +114,7 @@ export default function EditPage() {
           </Card>
 
           {results.length > 0 && (
-            <ResultGallery
-              images={results.map((img) => ({
-                b64: img.b64_json,
-                mimeType: img.mimeType,
-              }))}
-            />
+            <ResultGallery images={resultGalleryImages(results)} />
           )}
         </div>
 
