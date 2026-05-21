@@ -64,13 +64,15 @@ export async function saveImagesForHistory(
   prefix?: string,
 ): Promise<HistoryImageRef[]> {
   const results = await Promise.allSettled(
-    images.map((img) =>
-      fetch("/api/save-image", {
+    images.map(async (img) => {
+      const res = await fetch("/api/save-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ b64: img.b64_json, mimeType: img.mimeType, prefix }),
-      }).then((r) => r.json() as Promise<{ path: string; name: string }>),
-    ),
+      });
+      if (!res.ok) return null;
+      return res.json() as Promise<{ path: string; name: string }>;
+    }),
   );
   return results
     .filter(
