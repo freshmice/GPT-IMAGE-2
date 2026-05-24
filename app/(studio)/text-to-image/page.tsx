@@ -100,8 +100,13 @@ export default function TextToImagePage() {
             </CardContent>
           </Card>
 
-          {images.length > 0 && (
-            <ResultGallery images={resultGalleryImages(images)} />
+          {(loading || images.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(images)}
+              loading={loading}
+              expectedCount={n}
+              status={loading ? "图片生成后会自动保存，并显示在这里" : undefined}
+            />
           )}
         </div>
 

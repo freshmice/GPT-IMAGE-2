@@ -213,8 +213,13 @@ export default function StoryboardPage() {
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
-            <ResultGallery images={resultGalleryImages(results)} />
+          {(loading || results.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(results)}
+              loading={loading}
+              expectedCount={1}
+              status={loading ? "正在生成连续分镜画面" : undefined}
+            />
           )}
         </div>
 

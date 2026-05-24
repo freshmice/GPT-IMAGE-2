@@ -23,6 +23,32 @@ import { SIZES_EDIT, SIZES_GENERATE, QUALITIES } from "@/lib/constants";
 import { TURNAROUND_REF_PROMPT, TURNAROUND_TXT_PROMPT } from "@/lib/prompts";
 import type { GeneratedImage } from "@/lib/types";
 
+const TURNAROUND_STYLES = [
+  { label: "写实定妆照", value: "写实影视定妆照，真实布料质感，棚拍产品级光线" },
+  { label: "游戏设定稿", value: "高质量游戏角色设定稿，细节清晰，材质可读" },
+  { label: "动漫设定稿", value: "精致动漫角色设定稿，线条干净，色彩稳定" },
+];
+
+const TURNAROUND_BACKGROUNDS = [
+  { label: "纯白棚拍", value: "纯白背景，柔和均匀棚拍光线，轻微接触阴影" },
+  { label: "浅灰背景", value: "极浅灰背景，柔和顶光，服装轮廓清楚" },
+  { label: "透明感白底", value: "干净白底，高亮但不过曝，适合抠图和设计参考" },
+];
+
+const TURNAROUND_SHOTS = [
+  { label: "正面半身", value: "左侧肖像必须为正面拍摄，头顶到胸口，脸部居中清晰" },
+  { label: "正面上半身", value: "左侧肖像必须为正面拍摄，头顶到腰部，展示更多服装结构" },
+  { label: "证件照构图", value: "左侧肖像为证件照式正面构图，表情自然，五官比例准确" },
+];
+
+const styleOptions = TURNAROUND_STYLES.map((item) => item.value);
+const backgroundOptions = TURNAROUND_BACKGROUNDS.map((item) => item.value);
+const shotOptions = TURNAROUND_SHOTS.map((item) => item.value);
+
+function optionLabel(options: { label: string; value: string }[], value: string) {
+  return options.find((item) => item.value === value)?.label ?? value;
+}
+
 export default function TurnaroundPage() {
   const { apiKey, baseUrl, model } = useCredentialsStore();
   const pushHistory = useHistoryStore((s) => s.push);
@@ -31,7 +57,10 @@ export default function TurnaroundPage() {
   const [refs, setRefs] = React.useState<File[]>([]);
   const [description, setDescription] = React.useState("");
   const [extraDesc, setExtraDesc] = React.useState("");
-  const [size, setSize] = React.useState<string>("1536x1024");
+  const [turnaroundStyle, setTurnaroundStyle] = React.useState(TURNAROUND_STYLES[0].value);
+  const [background, setBackground] = React.useState(TURNAROUND_BACKGROUNDS[0].value);
+  const [shot, setShot] = React.useState(TURNAROUND_SHOTS[0].value);
+  const [size, setSize] = React.useState<string>("1792x1024");
   const [quality, setQuality] = React.useState<string>("auto");
   const [loading, setLoading] = React.useState(false);
   const [elapsedMs, setElapsedMs] = React.useState<number>();
@@ -57,8 +86,16 @@ export default function TurnaroundPage() {
     try {
       const prompt =
         mode === "ref"
-          ? TURNAROUND_REF_PROMPT(extraDesc.trim())
-          : TURNAROUND_TXT_PROMPT(description.trim());
+          ? TURNAROUND_REF_PROMPT(extraDesc.trim(), {
+              style: turnaroundStyle,
+              background,
+              shot,
+            })
+          : TURNAROUND_TXT_PROMPT(description.trim(), {
+              style: turnaroundStyle,
+              background,
+              shot,
+            });
 
       const res =
         mode === "ref"
@@ -107,7 +144,7 @@ export default function TurnaroundPage() {
     <div className="space-y-6">
       <PageHeader
         title="人物三视图"
-        description="生成角色正面半身 + 左中右三个全身视图，适合角色设计参考"
+        description="生成左侧正面半身 + 右侧正面、侧面、背面全身的角色设定图"
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
@@ -141,7 +178,7 @@ export default function TurnaroundPage() {
                     <Label htmlFor="extra">补充描述（可选）</Label>
                     <Textarea
                       id="extra"
-                      placeholder="补充角色特征，如：蓝色短发、红色战甲…"
+                      placeholder="补充角色特征，如：黑色古装、银色发冠、腰间玉佩、长发束起…"
                       rows={3}
                       value={extraDesc}
                       onChange={(e) => setExtraDesc(e.target.value)}
@@ -174,8 +211,14 @@ export default function TurnaroundPage() {
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
-            <ResultGallery images={resultGalleryImages(results)} />
+          {(loading || results.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(results)}
+              loading={loading}
+              expectedCount={1}
+              title="三视图结果"
+              status={loading ? "正在生成正面半身、正面全身、侧面全身和背面全身" : undefined}
+            />
           )}
         </div>
 
@@ -194,9 +237,30 @@ export default function TurnaroundPage() {
                 onChange={setQuality}
                 options={QUALITIES}
               />
+              <ParamSelect
+                label="风格"
+                value={turnaroundStyle}
+                onChange={setTurnaroundStyle}
+                options={styleOptions}
+                labelFor={(v) => optionLabel(TURNAROUND_STYLES, v)}
+              />
+              <ParamSelect
+                label="背景"
+                value={background}
+                onChange={setBackground}
+                options={backgroundOptions}
+                labelFor={(v) => optionLabel(TURNAROUND_BACKGROUNDS, v)}
+              />
+              <ParamSelect
+                label="左侧肖像"
+                value={shot}
+                onChange={setShot}
+                options={shotOptions}
+                labelFor={(v) => optionLabel(TURNAROUND_SHOTS, v)}
+              />
               <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
                 <p className="font-medium text-foreground">排版说明</p>
-                <p>左侧 1/3：正面半身特写；右侧 2/3：左、正、右三个全身视图。建议使用横版尺寸。</p>
+                <p>左侧：正面半身特写；右侧：正面、侧面、背面三个全身站立视图。建议使用 1792×1024 或 1536×1024。</p>
               </div>
             </CardContent>
           </Card>

@@ -110,8 +110,13 @@ export default function SceneViewsPage() {
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
-            <ResultGallery images={resultGalleryImages(results)} />
+          {(loading || results.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(results)}
+              loading={loading}
+              expectedCount={1}
+              status={loading ? "正在整理同一场景的多方向视图" : undefined}
+            />
           )}
         </div>
 

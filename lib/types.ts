@@ -29,6 +29,13 @@ export interface EditRequest extends Credentials {
   prefix?: string;
 }
 
+export interface TurnaroundPromptOptions {
+  style?: string;
+  background?: string;
+  shot?: string;
+  notes?: string;
+}
+
 export interface GeneratedImage {
   url: string;
   downloadUrl?: string;

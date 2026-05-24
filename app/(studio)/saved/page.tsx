@@ -39,18 +39,28 @@ export default function SavedPage() {
   const [loading, setLoading] = React.useState(true);
   const [lightbox, setLightbox] = React.useState<SavedItem | null>(null);
 
-  async function load() {
-    setLoading(true);
+  const load = React.useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
-      const res = await fetch("/api/saved-images");
+      const res = await fetch("/api/saved-images", { cache: "no-store" });
       const { items } = await res.json();
       setItems(items);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  }
+  }, []);
 
-  React.useEffect(() => { load(); }, []);
+  React.useEffect(() => { load(); }, [load]);
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        load(false);
+      }
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [load]);
 
   async function handleDelete(item: SavedItem) {
     const res = await fetch("/api/saved-images", {
@@ -79,7 +89,7 @@ export default function SavedPage() {
           description={`共 ${items.length} 张，保存在持久图片存储中`}
           className="mb-0"
         />
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={() => load()} disabled={loading}>
           <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           刷新
         </Button>

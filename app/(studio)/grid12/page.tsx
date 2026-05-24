@@ -202,8 +202,13 @@ export default function Grid12Page() {
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
-            <ResultGallery images={resultGalleryImages(results)} />
+          {(loading || results.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(results)}
+              loading={loading}
+              expectedCount={1}
+              status={loading ? "正在生成 12 格角色动作与表情" : undefined}
+            />
           )}
         </div>
 

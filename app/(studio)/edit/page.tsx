@@ -113,8 +113,13 @@ export default function EditPage() {
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
-            <ResultGallery images={resultGalleryImages(results)} />
+          {(loading || results.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(results)}
+              loading={loading}
+              expectedCount={n}
+              status={loading ? "正在根据参考图和指令生成新图片" : undefined}
+            />
           )}
         </div>
 

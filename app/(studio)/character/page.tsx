@@ -123,8 +123,13 @@ export default function CharacterPage() {
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
-            <ResultGallery images={resultGalleryImages(results)} />
+          {(loading || results.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(results)}
+              loading={loading}
+              expectedCount={n}
+              status={loading ? "正在锁定角色外观并生成新场景" : undefined}
+            />
           )}
         </div>
 

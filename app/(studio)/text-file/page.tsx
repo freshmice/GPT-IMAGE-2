@@ -186,8 +186,13 @@ export default function TextFilePage() {
             </CardContent>
           </Card>
 
-          {results.length > 0 && (
-            <ResultGallery images={resultGalleryImages(results)} />
+          {(loading || results.length > 0) && (
+            <ResultGallery
+              images={resultGalleryImages(results)}
+              loading={loading}
+              expectedCount={n}
+              status={loading ? "正在把文本内容转换成图像" : undefined}
+            />
           )}
         </div>
 

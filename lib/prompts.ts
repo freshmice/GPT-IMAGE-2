@@ -1,3 +1,5 @@
+import type { TurnaroundPromptOptions } from "@/lib/types";
+
 /** 漫剧 prompt 模板 */
 
 export const CHARACTER_LOCK_PREFIX =
@@ -40,23 +42,43 @@ export const STORYBOARD_FRAME_TEMPLATE = (
   "。";
 
 export const TURNAROUND_LAYOUT =
-  "生成一张**角色三视图设定稿**（character sheet），画面构图严格如下：\n" +
-  "• 整体横版画布，淡灰/米白纯色背景，画面干净无杂物、无文字、无水印。\n" +
-  "• **左侧约 1/3** 区域：放**一张半身肖像**（头到胸，正面 3/4 侧视角），作为该角色的主视觉、展示五官与表情。\n" +
-  "• **右侧约 2/3** 区域：水平等距并列**三个全身站立图**，从左到右依次是" +
-  "**正面（front view）** · **侧面（side view，面向画面左侧）** · **背面（back view）**。\n" +
-  "• 三个全身图高度一致、站在同一地平线、使用 T-pose 或自然放松站姿；" +
-  "服装、发型、配饰、发色、瞳色、体型在所有视图中**完全一致**；光源统一（柔和顶光）。\n" +
-  "• 整张图像呈现为专业游戏/动漫**角色设定稿**风格。\n";
+  "生成一张专业角色三视图设定稿，严格参考如下版式：\n" +
+  "1. 整体为超宽横版画布，纯白或极浅灰背景，干净棚拍光线，无文字、无水印、无边框、无标签。\n" +
+  "2. 左侧约 42% 画布放一张角色正面半身肖像，必须是正面拍摄，头顶到胸口/上半身，脸部清晰，占据左侧主要面积。\n" +
+  "3. 右侧约 58% 画布水平排列三个全身站立视图，从左到右依次为：正面全身、侧面全身、背面全身。\n" +
+  "4. 三个全身视图高度一致，脚底站在同一地平线，人物间距均匀，姿态自然放松，镜头平视，不能透视夸张。\n" +
+  "5. 四个形象必须是同一角色：脸型、发型、发饰、服装、纹样、配饰、腰带、鞋履、体型和主色调完全一致。\n" +
+  "6. 画面质感像角色造型定妆照/游戏影视角色设定稿，细节清晰，服装纹理和背面结构可读。\n";
+
+function optionLines(options?: TurnaroundPromptOptions) {
+  return [
+    options?.style && `视觉风格：${options.style}`,
+    options?.background && `背景与光线：${options.background}`,
+    options?.shot && `镜头规格：${options.shot}`,
+    options?.notes && `补充设定：${options.notes}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 /** turnaround page (ref mode): TURNAROUND_REF_PROMPT(extraDesc?) */
-export const TURNAROUND_REF_PROMPT = (extra?: string): string =>
-  `基于参考图中同一角色的外貌特征（脸型、发型、发色、瞳色、服装细节），${TURNAROUND_LAYOUT}` +
-  (extra ? `\n补充设定：${extra}` : "");
+export const TURNAROUND_REF_PROMPT = (
+  extra?: string,
+  options?: TurnaroundPromptOptions,
+): string =>
+  `基于参考图中同一角色的外貌特征，尤其锁定脸型、五官、发型、发色、发饰、服装剪裁、刺绣纹样、配饰和鞋履。\n${TURNAROUND_LAYOUT}` +
+  [extra && `补充设定：${extra}`, optionLines(options)]
+    .filter(Boolean)
+    .map((line) => `\n${line}`)
+    .join("");
 
 /** turnaround page (text mode): TURNAROUND_TXT_PROMPT(charDesc) */
-export const TURNAROUND_TXT_PROMPT = (charDesc: string): string =>
-  `根据下面的**角色文字设定**，${TURNAROUND_LAYOUT}角色设定：${charDesc}`;
+export const TURNAROUND_TXT_PROMPT = (
+  charDesc: string,
+  options?: TurnaroundPromptOptions,
+): string =>
+  `根据下面的角色文字设定生成同一角色。\n${TURNAROUND_LAYOUT}角色设定：${charDesc}` +
+  (optionLines(options) ? `\n${optionLines(options)}` : "");
 
 export const TWELVE_GRID_DEFAULT_CELLS = [
   "正面半身微笑", "侧脸凝视远方", "开怀大笑",

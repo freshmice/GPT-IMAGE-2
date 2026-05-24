@@ -15,18 +15,145 @@ async function parseErr(res: Response): Promise<string> {
   }
 }
 
+class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+interface StoredImageResponseItem {
+  name: string;
+  url?: string;
+  path?: string;
+  downloadUrl?: string;
+  pathname?: string;
+  size?: number;
+  mtime?: number;
+}
+
+const RECOVERABLE_STATUSES = new Set([408, 502, 503, 504, 524]);
+const RECOVERY_POLL_INTERVAL_MS = 2500;
+const RECOVERY_POLL_ATTEMPTS = 24;
+
+function isRecoverableRequestError(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    return error.status === undefined || RECOVERABLE_STATUSES.has(error.status);
+  }
+  return error instanceof TypeError || error instanceof DOMException;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function safePrefix(prefix?: string) {
+  return (prefix ?? "image")
+    .trim()
+    .replace(/[^a-z0-9_-]/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40) || "image";
+}
+
+async function recoverSavedImages(opts: {
+  prefix?: string;
+  startedAt: number;
+  expectedCount?: number;
+  signal?: AbortSignal;
+}): Promise<GeneratedImage[]> {
+  const prefix = `${safePrefix(opts.prefix)}-`;
+  const expectedCount = Math.max(1, opts.expectedCount ?? 1);
+  const startedAt = opts.startedAt - 5000;
+
+  for (let attempt = 0; attempt < RECOVERY_POLL_ATTEMPTS; attempt++) {
+    if (opts.signal?.aborted) throw opts.signal.reason;
+
+    const res = await fetch("/api/saved-images", {
+      method: "GET",
+      cache: "no-store",
+      signal: opts.signal,
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { items?: StoredImageResponseItem[] };
+      const images = (data.items ?? [])
+        .filter((item) => item.name.startsWith(prefix))
+        .filter((item) => (item.mtime ?? 0) >= startedAt)
+        .slice(0, expectedCount)
+        .map((item) => ({
+          url: item.url || item.path || "",
+          downloadUrl: item.downloadUrl,
+          pathname: item.pathname,
+          name: item.name,
+          size: item.size,
+          createdAt: item.mtime,
+        }))
+        .filter((item) => item.url);
+
+      if (images.length >= expectedCount) return images;
+    }
+
+    await sleep(RECOVERY_POLL_INTERVAL_MS);
+  }
+
+  return [];
+}
+
+async function fetchJsonWithRecovery<T extends GenerateResponse>(opts: {
+  url: string;
+  init: RequestInit;
+  prefix?: string;
+  expectedCount?: number;
+  signal?: AbortSignal;
+}): Promise<T> {
+  const startedAt = Date.now();
+
+  try {
+    const res = await fetch(opts.url, {
+      ...opts.init,
+      signal: opts.signal,
+    });
+    if (!res.ok) throw new ApiRequestError(await parseErr(res), res.status);
+    return res.json();
+  } catch (error) {
+    if (!isRecoverableRequestError(error)) throw error;
+
+    const images = await recoverSavedImages({
+      prefix: opts.prefix,
+      startedAt,
+      expectedCount: opts.expectedCount,
+      signal: opts.signal,
+    });
+
+    if (images.length > 0) {
+      return {
+        images,
+        elapsedMs: Date.now() - startedAt,
+      } as T;
+    }
+
+    throw error;
+  }
+}
+
 export async function apiGenerate(
   body: GenerateRequest,
   signal?: AbortSignal,
 ): Promise<GenerateResponse> {
-  const res = await fetch("/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  return fetchJsonWithRecovery({
+    url: "/api/generate",
+    init: {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    prefix: body.prefix,
+    expectedCount: body.n,
     signal,
   });
-  if (!res.ok) throw new Error(await parseErr(res));
-  return res.json();
 }
 
 export function resultGalleryImages(images: GeneratedImage[]) {
@@ -57,13 +184,16 @@ export async function apiEdit(
   if (req.mask && req.mask.size > 0) {
     fd.set("mask", req.mask, req.mask.name || "mask.png");
   }
-  const res = await fetch("/api/edit", {
-    method: "POST",
-    body: fd,
+  return fetchJsonWithRecovery({
+    url: "/api/edit",
+    init: {
+      method: "POST",
+      body: fd,
+    },
+    prefix: req.prefix,
+    expectedCount: req.n,
     signal,
   });
-  if (!res.ok) throw new Error(await parseErr(res));
-  return res.json();
 }
 
 export function imagesToHistoryRefs(images: GeneratedImage[]) {
