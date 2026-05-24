@@ -36,8 +36,8 @@ interface StoredImageResponseItem {
 }
 
 const RECOVERABLE_STATUSES = new Set([408, 502, 503, 504, 524]);
-const RECOVERY_POLL_INTERVAL_MS = 2500;
-const RECOVERY_POLL_ATTEMPTS = 24;
+const RECOVERY_POLL_INTERVAL_MS = 2000;
+const RECOVERY_POLL_ATTEMPTS = 45;
 
 function isRecoverableRequestError(error: unknown) {
   if (error instanceof ApiRequestError) {
@@ -143,14 +143,15 @@ export async function apiGenerate(
   body: GenerateRequest,
   signal?: AbortSignal,
 ): Promise<GenerateResponse> {
+  const requestPrefix = uniqueRequestPrefix(body.prefix);
   return fetchJsonWithRecovery({
     url: "/api/generate",
     init: {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, prefix: requestPrefix }),
     },
-    prefix: body.prefix,
+    prefix: requestPrefix,
     expectedCount: body.n,
     signal,
   });
@@ -169,6 +170,7 @@ export async function apiEdit(
   req: EditRequest,
   signal?: AbortSignal,
 ): Promise<GenerateResponse> {
+  const requestPrefix = uniqueRequestPrefix(req.prefix);
   const fd = new FormData();
   fd.set("apiKey", req.apiKey);
   fd.set("baseUrl", req.baseUrl);
@@ -177,7 +179,7 @@ export async function apiEdit(
   if (req.n != null) fd.set("n", String(req.n));
   if (req.size) fd.set("size", req.size);
   if (req.quality) fd.set("quality", req.quality);
-  if (req.prefix) fd.set("prefix", req.prefix);
+  fd.set("prefix", requestPrefix);
   for (const [i, img] of req.images.entries()) {
     fd.append("image", img, img.name || `ref${i}.png`);
   }
@@ -190,10 +192,15 @@ export async function apiEdit(
       method: "POST",
       body: fd,
     },
-    prefix: req.prefix,
+    prefix: requestPrefix,
     expectedCount: req.n,
     signal,
   });
+}
+
+function uniqueRequestPrefix(prefix?: string) {
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `${safePrefix(prefix)}-${Date.now().toString(36)}-${rand}`;
 }
 
 export function imagesToHistoryRefs(images: GeneratedImage[]) {

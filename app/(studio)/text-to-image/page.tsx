@@ -97,17 +97,11 @@ export default function TextToImagePage() {
                 onGenerate={handleGenerate}
                 elapsedMs={elapsedMs}
               />
+              {images.length > 0 && (
+                <ResultGallery images={resultGalleryImages(images)} />
+              )}
             </CardContent>
           </Card>
-
-          {(loading || images.length > 0) && (
-            <ResultGallery
-              images={resultGalleryImages(images)}
-              loading={loading}
-              expectedCount={n}
-              status={loading ? "图片生成后会自动保存，并显示在这里" : undefined}
-            />
-          )}
         </div>
 
         <div className="space-y-4">

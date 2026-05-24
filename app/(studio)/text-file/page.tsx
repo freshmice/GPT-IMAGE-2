@@ -183,17 +183,11 @@ export default function TextFilePage() {
                 elapsedMs={elapsedMs}
                 disabled={!finalPrompt}
               />
+              {results.length > 0 && (
+                <ResultGallery images={resultGalleryImages(results)} />
+              )}
             </CardContent>
           </Card>
-
-          {(loading || results.length > 0) && (
-            <ResultGallery
-              images={resultGalleryImages(results)}
-              loading={loading}
-              expectedCount={n}
-              status={loading ? "正在把文本内容转换成图像" : undefined}
-            />
-          )}
         </div>
 
         <div className="space-y-4">

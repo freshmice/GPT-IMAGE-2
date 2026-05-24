@@ -208,18 +208,11 @@ export default function TurnaroundPage() {
                 label="生成三视图"
                 elapsedMs={elapsedMs}
               />
+              {results.length > 0 && (
+                <ResultGallery images={resultGalleryImages(results)} />
+              )}
             </CardContent>
           </Card>
-
-          {(loading || results.length > 0) && (
-            <ResultGallery
-              images={resultGalleryImages(results)}
-              loading={loading}
-              expectedCount={1}
-              title="三视图结果"
-              status={loading ? "正在生成正面半身、正面全身、侧面全身和背面全身" : undefined}
-            />
-          )}
         </div>
 
         <div className="space-y-4">
