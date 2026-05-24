@@ -37,7 +37,8 @@ interface StoredImageResponseItem {
 
 const RECOVERABLE_STATUSES = new Set([408, 502, 503, 504, 524]);
 const RECOVERY_POLL_INTERVAL_MS = 2000;
-const RECOVERY_POLL_ATTEMPTS = 45;
+const RECOVERY_POLL_ATTEMPTS = 90;
+const DIRECT_REQUEST_GRACE_MS = 1500;
 
 function isRecoverableRequestError(error: unknown) {
   if (error instanceof ApiRequestError) {
@@ -48,6 +49,10 @@ function isRecoverableRequestError(error: unknown) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function safePrefix(prefix?: string) {
@@ -102,41 +107,67 @@ async function recoverSavedImages(opts: {
   return [];
 }
 
-async function fetchJsonWithRecovery<T extends GenerateResponse>(opts: {
+async function fetchJsonWithRecovery(opts: {
   url: string;
   init: RequestInit;
   prefix?: string;
   expectedCount?: number;
   signal?: AbortSignal;
-}): Promise<T> {
+}): Promise<GenerateResponse> {
   const startedAt = Date.now();
+  const recovery = recoverSavedImages({
+    prefix: opts.prefix,
+    startedAt,
+    expectedCount: opts.expectedCount,
+    signal: opts.signal,
+  });
 
-  try {
+  const direct = (async () => {
     const res = await fetch(opts.url, {
       ...opts.init,
       signal: opts.signal,
     });
     if (!res.ok) throw new ApiRequestError(await parseErr(res), res.status);
-    return res.json();
+    return res.json() as Promise<GenerateResponse>;
+  })();
+
+  try {
+    return await Promise.race([
+      direct,
+      recovery.then((images) =>
+        images.length > 0
+          ? ({
+              images,
+              elapsedMs: Date.now() - startedAt,
+            } satisfies GenerateResponse)
+          : never<GenerateResponse>(),
+      ),
+    ]);
   } catch (error) {
-    if (!isRecoverableRequestError(error)) throw error;
+    if (isAbortError(error)) throw error;
+    if (!isRecoverableRequestError(error)) {
+      await sleep(DIRECT_REQUEST_GRACE_MS);
+      const images = await recovery.catch(() => []);
+      if (images.length === 0) throw error;
 
-    const images = await recoverSavedImages({
-      prefix: opts.prefix,
-      startedAt,
-      expectedCount: opts.expectedCount,
-      signal: opts.signal,
-    });
-
-    if (images.length > 0) {
       return {
         images,
         elapsedMs: Date.now() - startedAt,
-      } as T;
+      };
     }
 
-    throw error;
+    const images = await recovery;
+    if (images.length === 0) throw error;
+
+    return {
+      images,
+      elapsedMs: Date.now() - startedAt,
+    };
   }
+}
+
+function never<T>() {
+  return new Promise<T>(() => {});
 }
 
 export async function apiGenerate(
