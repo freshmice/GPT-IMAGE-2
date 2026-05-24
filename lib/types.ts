@@ -7,6 +7,7 @@ export interface Credentials {
   apiKey: string;
   baseUrl: string;
   model: string;
+  clientId?: string;
 }
 
 export interface GenerateRequest extends Credentials {

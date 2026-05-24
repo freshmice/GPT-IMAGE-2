@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/studio/page-header";
+import { getClientId } from "@/lib/client-id";
 import { prettyBytes } from "@/lib/utils";
 
 interface SavedItem {
@@ -42,7 +43,11 @@ export default function SavedPage() {
   const load = React.useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const res = await fetch("/api/saved-images", { cache: "no-store" });
+      const clientId = getClientId();
+      const res = await fetch(
+        `/api/saved-images?clientId=${encodeURIComponent(clientId)}`,
+        { cache: "no-store" },
+      );
       const { items } = await res.json();
       setItems(items);
     } finally {
@@ -70,6 +75,7 @@ export default function SavedPage() {
         name: item.name,
         pathname: item.pathname,
         url: item.url || item.path,
+        clientId: getClientId(),
       }),
     });
     if (res.ok) {

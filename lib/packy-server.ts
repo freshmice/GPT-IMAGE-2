@@ -13,8 +13,9 @@ export async function callGenerations(opts: {
   baseUrl: string;
   body: Record<string, unknown>;
   prefix?: string;
+  ownerId?: string;
 }): Promise<{ images: GeneratedImage[]; elapsedMs: number }> {
-  const { apiKey, baseUrl, body, prefix } = opts;
+  const { apiKey, baseUrl, body, prefix, ownerId } = opts;
   const t0 = Date.now();
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/images/generations`, {
     method: "POST",
@@ -27,7 +28,7 @@ export async function callGenerations(opts: {
   });
   if (!res.ok) throw new Error(await normalizeUpstreamError(res, baseUrl));
   const json = (await res.json()) as { data?: UpstreamImage[] };
-  const images = await toGeneratedImages(json.data || [], prefix);
+  const images = await toGeneratedImages(json.data || [], prefix, ownerId);
   return { images, elapsedMs: Date.now() - t0 };
 }
 
@@ -37,8 +38,9 @@ export async function callEdits(opts: {
   baseUrl: string;
   form: FormData;
   prefix?: string;
+  ownerId?: string;
 }): Promise<{ images: GeneratedImage[]; elapsedMs: number }> {
-  const { apiKey, baseUrl, form, prefix } = opts;
+  const { apiKey, baseUrl, form, prefix, ownerId } = opts;
   const t0 = Date.now();
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/images/edits`, {
     method: "POST",
@@ -48,13 +50,14 @@ export async function callEdits(opts: {
   });
   if (!res.ok) throw new Error(await normalizeUpstreamError(res, baseUrl));
   const json = (await res.json()) as { data?: UpstreamImage[] };
-  const images = await toGeneratedImages(json.data || [], prefix);
+  const images = await toGeneratedImages(json.data || [], prefix, ownerId);
   return { images, elapsedMs: Date.now() - t0 };
 }
 
 async function toGeneratedImages(
   items: UpstreamImage[],
   prefix?: string,
+  ownerId?: string,
 ): Promise<GeneratedImage[]> {
   const out: ImageToStore[] = [];
   for (const it of items) {
@@ -72,5 +75,5 @@ async function toGeneratedImages(
     }
   }
   if (out.length === 0) throw new Error("上游未返回可用图像");
-  return Promise.all(out.map((image) => storeImage(image, prefix)));
+  return Promise.all(out.map((image) => storeImage(image, prefix, ownerId)));
 }

@@ -48,24 +48,45 @@ function safePrefix(prefix?: string) {
     .slice(0, 40) || "image";
 }
 
+function safeOwnerId(ownerId?: string) {
+  return (ownerId ?? "")
+    .trim()
+    .replace(/[^a-z0-9_-]/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
 function fileName(prefix: string | undefined, mimeType: string) {
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 7);
   return `${safePrefix(prefix)}-${ts}-${rand}.${extensionForMimeType(mimeType)}`;
 }
 
-function localPublicPath(name: string) {
-  return `/outputs/${name}`;
+function storagePrefix(ownerId?: string) {
+  const safeOwner = safeOwnerId(ownerId);
+  return safeOwner ? `${BLOB_PREFIX}${safeOwner}/` : BLOB_PREFIX;
+}
+
+function localOutputDir(ownerId?: string) {
+  const safeOwner = safeOwnerId(ownerId);
+  return safeOwner ? join(OUTPUT_DIR, safeOwner) : OUTPUT_DIR;
+}
+
+function localPublicPath(name: string, ownerId?: string) {
+  const safeOwner = safeOwnerId(ownerId);
+  return safeOwner ? `/outputs/${safeOwner}/${name}` : `/outputs/${name}`;
 }
 
 export async function storeImage(
   image: ImageToStore,
   prefix?: string,
+  ownerId?: string,
 ): Promise<GeneratedImage> {
   const name = fileName(prefix, image.mimeType);
 
   if (canUseBlob()) {
-    const pathname = `${BLOB_PREFIX}${name}`;
+    const pathname = `${storagePrefix(ownerId)}${name}`;
     const blob = await put(pathname, image.bytes, {
       access: "public",
       contentType: image.mimeType,
@@ -85,12 +106,13 @@ export async function storeImage(
     };
   }
 
-  await mkdir(OUTPUT_DIR, { recursive: true });
-  await writeFile(join(OUTPUT_DIR, name), image.bytes);
+  const outputDir = localOutputDir(ownerId);
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(join(outputDir, name), image.bytes);
   return {
-    url: localPublicPath(name),
-    downloadUrl: localPublicPath(name),
-    pathname: localPublicPath(name),
+    url: localPublicPath(name, ownerId),
+    downloadUrl: localPublicPath(name, ownerId),
+    pathname: localPublicPath(name, ownerId),
     name,
     mimeType: image.mimeType,
     size: image.bytes.length,
@@ -98,12 +120,13 @@ export async function storeImage(
   };
 }
 
-export async function listStoredImages(): Promise<StoredImage[]> {
+export async function listStoredImages(ownerId?: string): Promise<StoredImage[]> {
+  const prefix = storagePrefix(ownerId);
   if (canUseBlob()) {
     const blobs = [];
     let cursor: string | undefined;
     do {
-      const page = await list({ prefix: BLOB_PREFIX, limit: 1000, cursor });
+      const page = await list({ prefix, limit: 1000, cursor });
       blobs.push(...page.blobs);
       cursor = page.hasMore ? page.cursor : undefined;
     } while (cursor);
@@ -125,13 +148,14 @@ export async function listStoredImages(): Promise<StoredImage[]> {
   }
 
   try {
-    const files = await readdir(OUTPUT_DIR);
+    const outputDir = localOutputDir(ownerId);
+    const files = await readdir(outputDir);
     const items = await Promise.all(
       files
         .filter((name) => !name.startsWith("."))
         .map(async (name) => {
-          const s = await stat(join(OUTPUT_DIR, name));
-          const path = localPublicPath(name);
+          const s = await stat(join(outputDir, name));
+          const path = localPublicPath(name, ownerId);
           return {
             name,
             path,
@@ -149,37 +173,44 @@ export async function listStoredImages(): Promise<StoredImage[]> {
   }
 }
 
-export async function deleteStoredImage(target: string) {
+export async function deleteStoredImage(target: string, ownerId?: string) {
   const trimmed = target.trim();
   if (!trimmed || trimmed.includes("..")) {
     throw new Error("Invalid image target");
   }
 
   if (canUseBlob()) {
-    await del(blobTarget(trimmed));
+    await del(blobTarget(trimmed, ownerId));
     return;
   }
 
-  await unlink(join(OUTPUT_DIR, localFileName(trimmed)));
+  await unlink(join(localOutputDir(ownerId), localFileName(trimmed, ownerId)));
 }
 
-function blobTarget(target: string) {
-  if (/^https?:\/\//i.test(target)) return target;
+function blobTarget(target: string, ownerId?: string) {
+  let pathname = target;
+  if (/^https?:\/\//i.test(target)) {
+    pathname = new URL(target).pathname;
+  }
 
-  const normalized = target.replace(/^\/+/, "");
-  if (normalized.startsWith(BLOB_PREFIX)) return normalized;
-  return `${BLOB_PREFIX}${normalized}`;
+  const normalized = pathname.replace(/^\/+/, "");
+  const prefix = storagePrefix(ownerId);
+  if (normalized.startsWith(prefix)) return normalized;
+  return `${prefix}${normalized.replace(/^outputs\/[^/]+\//, "")}`;
 }
 
-function localFileName(target: string) {
+function localFileName(target: string, ownerId?: string) {
   let pathname = target;
   if (/^https?:\/\//i.test(target)) {
     pathname = new URL(target).pathname;
   }
 
   const normalized = pathname.replace(/\\/g, "/").replace(/^\/+/, "");
-  const name = normalized.startsWith(BLOB_PREFIX)
-    ? normalized.slice(BLOB_PREFIX.length)
+  const prefix = storagePrefix(ownerId);
+  const name = normalized.startsWith(prefix)
+    ? normalized.slice(prefix.length)
+    : normalized.startsWith(BLOB_PREFIX)
+      ? normalized.slice(BLOB_PREFIX.length).split("/").pop() || ""
     : normalized;
 
   if (!name || name.includes("/") || name.includes("\\") || name.includes("..")) {

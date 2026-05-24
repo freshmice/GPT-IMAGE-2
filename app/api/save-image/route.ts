@@ -15,10 +15,11 @@ function safePrefix(prefix?: string) {
 }
 
 export async function POST(req: Request) {
-  const { b64, mimeType, prefix } = (await req.json()) as {
+  const { b64, mimeType, prefix, clientId } = (await req.json()) as {
     b64: string;
     mimeType?: string;
     prefix?: string;
+    clientId?: string;
   };
 
   if (!b64) return NextResponse.json({ error: "Missing b64" }, { status: 400 });
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
     const image = await storeImage(
       { bytes, mimeType: imageMimeType },
       safePrefix(prefix) || "saved",
+      clientId,
     );
     return NextResponse.json({
       path: image.url,

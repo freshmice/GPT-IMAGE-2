@@ -5,6 +5,7 @@ import type {
   GeneratedImage,
   ApiErrorResponse,
 } from "@/lib/types";
+import { getClientId } from "@/lib/client-id";
 
 async function parseErr(res: Response): Promise<string> {
   try {
@@ -68,6 +69,7 @@ async function recoverSavedImages(opts: {
   prefix?: string;
   startedAt: number;
   expectedCount?: number;
+  clientId?: string;
   signal?: AbortSignal;
 }): Promise<GeneratedImage[]> {
   const prefix = `${safePrefix(opts.prefix)}-`;
@@ -77,7 +79,10 @@ async function recoverSavedImages(opts: {
   for (let attempt = 0; attempt < RECOVERY_POLL_ATTEMPTS; attempt++) {
     if (opts.signal?.aborted) throw opts.signal.reason;
 
-    const res = await fetch("/api/saved-images", {
+    const query = opts.clientId
+      ? `?clientId=${encodeURIComponent(opts.clientId)}`
+      : "";
+    const res = await fetch(`/api/saved-images${query}`, {
       method: "GET",
       cache: "no-store",
       signal: opts.signal,
@@ -112,6 +117,7 @@ async function fetchJsonWithRecovery(opts: {
   init: RequestInit;
   prefix?: string;
   expectedCount?: number;
+  clientId?: string;
   signal?: AbortSignal;
 }): Promise<GenerateResponse> {
   const startedAt = Date.now();
@@ -119,6 +125,7 @@ async function fetchJsonWithRecovery(opts: {
     prefix: opts.prefix,
     startedAt,
     expectedCount: opts.expectedCount,
+    clientId: opts.clientId,
     signal: opts.signal,
   });
 
@@ -175,15 +182,17 @@ export async function apiGenerate(
   signal?: AbortSignal,
 ): Promise<GenerateResponse> {
   const requestPrefix = uniqueRequestPrefix(body.prefix);
+  const clientId = getClientId();
   return fetchJsonWithRecovery({
     url: "/api/generate",
     init: {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, prefix: requestPrefix }),
+      body: JSON.stringify({ ...body, prefix: requestPrefix, clientId }),
     },
     prefix: requestPrefix,
     expectedCount: body.n,
+    clientId,
     signal,
   });
 }
@@ -202,6 +211,7 @@ export async function apiEdit(
   signal?: AbortSignal,
 ): Promise<GenerateResponse> {
   const requestPrefix = uniqueRequestPrefix(req.prefix);
+  const clientId = getClientId();
   const fd = new FormData();
   fd.set("apiKey", req.apiKey);
   fd.set("baseUrl", req.baseUrl);
@@ -211,6 +221,7 @@ export async function apiEdit(
   if (req.size) fd.set("size", req.size);
   if (req.quality) fd.set("quality", req.quality);
   fd.set("prefix", requestPrefix);
+  fd.set("clientId", clientId);
   for (const [i, img] of req.images.entries()) {
     fd.append("image", img, img.name || `ref${i}.png`);
   }
@@ -225,6 +236,7 @@ export async function apiEdit(
     },
     prefix: requestPrefix,
     expectedCount: req.n,
+    clientId,
     signal,
   });
 }

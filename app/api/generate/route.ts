@@ -17,6 +17,7 @@ const Schema = z.object({
   outputFormat: z.enum(["png", "jpeg", "webp"]).optional(),
   background: z.enum(["auto", "transparent", "opaque"]).optional(),
   prefix: z.string().optional(),
+  clientId: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
       baseUrl,
       body,
       prefix: data.prefix,
+      ownerId: data.clientId,
     });
     return NextResponse.json({ images, elapsedMs });
   } catch (e) {
